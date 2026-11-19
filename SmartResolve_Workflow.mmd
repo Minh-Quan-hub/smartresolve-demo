@@ -1,0 +1,50 @@
+sequenceDiagram
+    autonumber
+    actor U as Requester or reviewer
+    participant UI as Streamlit
+    participant LG as LangGraph
+    participant DB as SQLite
+    participant GH as GitHub via MCP
+
+    U->>UI: Submit an IT support ticket
+    UI->>DB: Save ticket and assign local status New
+    UI->>LG: Run the ticket workflow
+    LG->>LG: Intake classifies the request with OpenAI
+
+    alt Urgent, unclear or intake failed
+        LG->>LG: Skip duplicate and knowledge checks
+        LG->>LG: Route to Service Desk for review
+    else Normal and clear
+        LG->>LG: Search earlier tickets for possible duplicates
+        LG->>LG: Retrieve articles and generate cited suggestions
+        LG->>LG: Recommend a queue and decide if review is needed
+    end
+
+    LG->>DB: Save combined report and update local status
+    LG-->>UI: Return classification, guidance and routing
+    UI-->>U: Show saved results in the ticket queue
+
+    opt Review required and reviewer chooses to escalate
+        U->>UI: Open and review the GitHub issue draft
+        alt Reviewer approves publication
+            U->>UI: Approve and create GitHub issue
+            UI->>DB: Reserve one creation attempt for this ticket
+            UI->>GH: Call issue_write with method create
+            alt GitHub returns a confirmed issue link
+                GH-->>UI: Return issue link
+                UI->>DB: Save the link and creation status
+                UI-->>U: Show Open GitHub issue
+                opt Reviewer requests latest details
+                    U->>UI: Click Read latest GitHub details
+                    UI->>GH: Call issue_read with method get
+                    GH-->>UI: Return current issue state and details
+                    UI-->>U: Display issue details
+                end
+            else Creation cannot be confirmed
+                UI->>DB: Record uncertain status
+                UI-->>U: Block repeat creation and ask reviewer to check GitHub
+            end
+        else Reviewer leaves draft unapproved
+            UI-->>U: Keep the ticket in local review
+        end
+    end
