@@ -1,0 +1,52 @@
+flowchart TB
+    USER["Requester or reviewer"]
+    UI["Streamlit app · ticket form, queue and review"]
+
+    subgraph LG["LangGraph orchestration"]
+        RUN["Runtime · shared ticket state and routing"]
+        IA["Intake · classify ticket"]
+        DA["Duplicate detection · find related tickets"]
+        KA["Knowledge · retrieve sources and draft guidance"]
+        EA["Escalation · select queue and review status"]
+        WA["Workflow · save the combined report"]
+        RUN --- IA
+        RUN --- DA
+        RUN --- KA
+        RUN --- EA
+        RUN --- WA
+    end
+
+    subgraph KB["Knowledge and similarity"]
+        DOC["Troubleshooting articles · knowledge_base.json"]
+        OAI["OpenAI API · classification, guidance and embeddings"]
+        CH["ChromaDB · article and historical ticket vectors"]
+        DOC -->|Index articles| OAI
+        OAI -->|Store article vectors| CH
+    end
+
+    subgraph DATA["Local persistence"]
+        DB["SQLite · tickets, workflow reports and issue links"]
+    end
+
+    subgraph GH["GitHub integration"]
+        MCP["GitHub MCP client · create or read issue"]
+        REPO["GitHub Issues · demo repository"]
+        MCP <--> REPO
+    end
+
+    USER -->|Submit, review or approve| UI
+    UI <-->|Run triage and return results| RUN
+    UI <-->|Save ticket and reopen reports| DB
+    UI -->|Approved draft or read request| MCP
+    RUN -->|Classification, embeddings and guidance| OAI
+    RUN <-->|Search article and ticket vectors| CH
+    RUN <-->|Read ticket history and save results| DB
+
+    classDef app fill:#eeedff,stroke:#6954c7,color:#172139
+    classDef agent fill:#ffffff,stroke:#a29ad8,color:#172139
+    classDef store fill:#eaf6f4,stroke:#478d83,color:#172139
+    classDef integration fill:#fff4e5,stroke:#b68443,color:#172139
+    class USER,UI,RUN app
+    class IA,DA,KA,EA,WA agent
+    class DOC,OAI,CH,DB store
+    class MCP,REPO integration
